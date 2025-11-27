@@ -21,7 +21,6 @@ package export
 import (
 	"archive/zip"
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -49,18 +48,12 @@ func (eh *exportHandler) HandleExportRequest(w http.ResponseWriter, r *http.Requ
 
 	exportRequest, err := sysutils.DecodeJSONBody[ExportRequest](r)
 	if err != nil {
-		w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-		w.WriteHeader(http.StatusBadRequest)
-
 		errResp := apierror.ErrorResponse{
 			Code:        ErrorInvalidRequest.Code,
 			Message:     ErrorInvalidRequest.Error,
 			Description: ErrorInvalidRequest.ErrorDescription,
 		}
-		if encodeErr := json.NewEncoder(w).Encode(errResp); encodeErr != nil {
-			logger.Error("Error encoding error response", log.Error(encodeErr))
-			http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-		}
+		sysutils.WriteErrorResponse(w, http.StatusBadRequest, errResp, logger)
 		return
 	}
 
@@ -97,18 +90,12 @@ func (eh *exportHandler) HandleExportJSONRequest(w http.ResponseWriter, r *http.
 
 	exportRequest, err := sysutils.DecodeJSONBody[ExportRequest](r)
 	if err != nil {
-		w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-		w.WriteHeader(http.StatusBadRequest)
-
 		errResp := apierror.ErrorResponse{
 			Code:        ErrorInvalidRequest.Code,
 			Message:     ErrorInvalidRequest.Error,
 			Description: ErrorInvalidRequest.ErrorDescription,
 		}
-		if encodeErr := json.NewEncoder(w).Encode(errResp); encodeErr != nil {
-			logger.Error("Error encoding error response", log.Error(encodeErr))
-			http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-		}
+		sysutils.WriteErrorResponse(w, http.StatusBadRequest, errResp, logger)
 		return
 	}
 
@@ -120,14 +107,7 @@ func (eh *exportHandler) HandleExportJSONRequest(w http.ResponseWriter, r *http.
 	}
 
 	// Return the JSON response with files
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-
-	if err := json.NewEncoder(w).Encode(exportResponse); err != nil {
-		logger.Error("Error encoding JSON export response", log.Error(err))
-		http.Error(w, "Failed to encode export response", http.StatusInternalServerError)
-		return
-	}
+	sysutils.WriteSuccessResponse(w, http.StatusOK, exportResponse, logger)
 }
 
 // HandleExportZipRequest handles the export request and returns a ZIP file containing all resources.
@@ -136,18 +116,12 @@ func (eh *exportHandler) HandleExportZipRequest(w http.ResponseWriter, r *http.R
 
 	exportRequest, err := sysutils.DecodeJSONBody[ExportRequest](r)
 	if err != nil {
-		w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-		w.WriteHeader(http.StatusBadRequest)
-
 		errResp := apierror.ErrorResponse{
 			Code:        ErrorInvalidRequest.Code,
 			Message:     ErrorInvalidRequest.Error,
 			Description: ErrorInvalidRequest.ErrorDescription,
 		}
-		if encodeErr := json.NewEncoder(w).Encode(errResp); encodeErr != nil {
-			logger.Error("Error encoding error response", log.Error(encodeErr))
-			http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-		}
+		sysutils.WriteErrorResponse(w, http.StatusBadRequest, errResp, logger)
 		return
 	}
 
@@ -221,17 +195,10 @@ func (eh *exportHandler) handleError(w http.ResponseWriter, logger *log.Logger, 
 		statusCode = http.StatusBadRequest
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(statusCode)
-
 	errResp := apierror.ErrorResponse{
 		Code:        svcErr.Code,
 		Message:     svcErr.Error,
 		Description: svcErr.ErrorDescription,
 	}
-
-	if err := json.NewEncoder(w).Encode(errResp); err != nil {
-		logger.Error("Error encoding error response", log.Error(err))
-		http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-	}
+	sysutils.WriteErrorResponse(w, statusCode, errResp, logger)
 }

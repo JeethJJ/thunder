@@ -19,10 +19,8 @@
 package flowexec
 
 import (
-	"encoding/json"
 	"net/http"
 
-	serverconst "github.com/asgardeo/thunder/internal/system/constants"
 	"github.com/asgardeo/thunder/internal/system/error/apierror"
 	"github.com/asgardeo/thunder/internal/system/error/serviceerror"
 	"github.com/asgardeo/thunder/internal/system/log"
@@ -46,14 +44,7 @@ func (h *flowExecutionHandler) HandleFlowExecutionRequest(w http.ResponseWriter,
 
 	flowR, err := sysutils.DecodeJSONBody[FlowRequest](r)
 	if err != nil {
-		w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-		w.WriteHeader(http.StatusBadRequest)
-
-		if err := json.NewEncoder(w).Encode(APIErrorFlowRequestJSONDecodeError); err != nil {
-			logger.Error("Error encoding error response", log.Error(err))
-			http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-		}
-
+		sysutils.WriteErrorResponse(w, http.StatusBadRequest, APIErrorFlowRequestJSONDecodeError, logger)
 		return
 	}
 
@@ -81,37 +72,22 @@ func (h *flowExecutionHandler) HandleFlowExecutionRequest(w http.ResponseWriter,
 		FailureReason: flowStep.FailureReason,
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-
-	err = json.NewEncoder(w).Encode(flowResp)
-	if err != nil {
-		logger.Error("Error encoding response", log.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
-
+	sysutils.WriteSuccessResponse(w, http.StatusOK, flowResp, logger)
 	logger.Debug("Flow execution request handled successfully", log.String("flowID", flowResp.FlowID))
 }
 
 // handleFlowError handles errors that occur during flow execution as an API error response.
 func handleFlowError(w http.ResponseWriter, logger *log.Logger, flowErr *serviceerror.ServiceError) {
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-
 	errResp := apierror.ErrorResponse{
 		Code:        flowErr.Code,
 		Message:     flowErr.Error,
 		Description: flowErr.ErrorDescription,
 	}
 
+	statusCode := http.StatusInternalServerError
 	if flowErr.Type == serviceerror.ClientErrorType {
-		w.WriteHeader(http.StatusBadRequest)
-	} else {
-		w.WriteHeader(http.StatusInternalServerError)
+		statusCode = http.StatusBadRequest
 	}
 
-	if err := json.NewEncoder(w).Encode(errResp); err != nil {
-		logger.Error("Error encoding error response", log.Error(err))
-		http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-	}
+	sysutils.WriteErrorResponse(w, statusCode, errResp, logger)
 }

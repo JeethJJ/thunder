@@ -19,7 +19,6 @@
 package branding
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -78,13 +77,7 @@ func (bh *brandingHandler) HandleBrandingListRequest(w http.ResponseWriter, r *h
 		Links:        toHTTPLinks(brandingList.Links),
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-
-	isErr := writeToResponse(w, brandingListResponse, bh.logger)
-	if isErr {
-		return
-	}
+	sysutils.WriteSuccessResponse(w, http.StatusOK, brandingListResponse, bh.logger)
 
 	bh.logger.Debug("Successfully listed branding configurations with pagination",
 		log.Int("limit", limit), log.Int("offset", offset),
@@ -112,13 +105,7 @@ func (bh *brandingHandler) HandleBrandingPostRequest(w http.ResponseWriter, r *h
 		Preferences: createdBranding.Preferences,
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusCreated)
-
-	isErr := writeToResponse(w, brandingResponse, bh.logger)
-	if isErr {
-		return
-	}
+	sysutils.WriteSuccessResponse(w, http.StatusCreated, brandingResponse, bh.logger)
 
 	bh.logger.Debug("Successfully created branding configuration", log.String("id", createdBranding.ID))
 }
@@ -138,13 +125,7 @@ func (bh *brandingHandler) HandleBrandingGetRequest(w http.ResponseWriter, r *ht
 		Preferences: branding.Preferences,
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-
-	isErr := writeToResponse(w, brandingResponse, bh.logger)
-	if isErr {
-		return
-	}
+	sysutils.WriteSuccessResponse(w, http.StatusOK, brandingResponse, bh.logger)
 
 	bh.logger.Debug("Successfully retrieved branding configuration", log.String("id", id))
 }
@@ -170,13 +151,7 @@ func (bh *brandingHandler) HandleBrandingPutRequest(w http.ResponseWriter, r *ht
 		Preferences: updatedBranding.Preferences,
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-
-	isErr := writeToResponse(w, brandingResponse, bh.logger)
-	if isErr {
-		return
-	}
+	sysutils.WriteSuccessResponse(w, http.StatusOK, brandingResponse, bh.logger)
 
 	bh.logger.Debug("Successfully updated branding configuration", log.String("id", id))
 }
@@ -231,16 +206,6 @@ func toHTTPLinks(links []Link) []LinkResponse {
 	return httpLinks
 }
 
-// writeToResponse encodes the response as JSON and writes it to the ResponseWriter.
-func writeToResponse(w http.ResponseWriter, response any, logger *log.Logger) bool {
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		logger.Error("Error encoding response", log.Error(err))
-		handleEncodingError(w)
-		return true
-	}
-	return false
-}
-
 // handleError handles service errors and returns appropriate HTTP responses.
 func handleError(w http.ResponseWriter, logger *log.Logger,
 	svcErr *serviceerror.ServiceError) {
@@ -261,24 +226,10 @@ func handleError(w http.ResponseWriter, logger *log.Logger,
 		}
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(statusCode)
-
 	errResp := apierror.ErrorResponse{
 		Code:        svcErr.Code,
 		Message:     svcErr.Error,
 		Description: svcErr.ErrorDescription,
 	}
-
-	if err := json.NewEncoder(w).Encode(errResp); err != nil {
-		logger.Error("Error encoding error response", log.Error(err))
-		handleEncodingError(w)
-		return
-	}
-}
-
-// handleEncodingError handles errors that occur during response encoding.
-func handleEncodingError(w http.ResponseWriter) {
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusInternalServerError)
+	sysutils.WriteErrorResponse(w, statusCode, errResp, logger)
 }

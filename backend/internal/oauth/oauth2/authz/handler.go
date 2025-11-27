@@ -19,7 +19,6 @@
 package authz
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -34,7 +33,6 @@ import (
 	oauth2model "github.com/asgardeo/thunder/internal/oauth/oauth2/model"
 	oauth2utils "github.com/asgardeo/thunder/internal/oauth/oauth2/utils"
 	"github.com/asgardeo/thunder/internal/system/config"
-	serverconst "github.com/asgardeo/thunder/internal/system/constants"
 	"github.com/asgardeo/thunder/internal/system/jwt"
 	"github.com/asgardeo/thunder/internal/system/log"
 	"github.com/asgardeo/thunder/internal/system/utils"
@@ -458,15 +456,7 @@ func (ah *authorizeHandler) writeAuthZResponse(w http.ResponseWriter, redirectUR
 		RedirectURI: redirectURI,
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-
-	err := json.NewEncoder(w).Encode(authZResp)
-	if err != nil {
-		logger.Error("Error encoding response", log.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
+	systemutils.WriteSuccessResponse(w, http.StatusOK, authZResp, logger)
 }
 
 // writeAuthZResponseToErrorPage writes the authorization response to the error page.

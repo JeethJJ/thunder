@@ -19,13 +19,12 @@
 package jwks
 
 import (
-	"encoding/json"
 	"net/http"
 
-	serverconst "github.com/asgardeo/thunder/internal/system/constants"
 	"github.com/asgardeo/thunder/internal/system/error/apierror"
 	"github.com/asgardeo/thunder/internal/system/error/serviceerror"
 	"github.com/asgardeo/thunder/internal/system/log"
+	sysutils "github.com/asgardeo/thunder/internal/system/utils"
 )
 
 // jwksHandler handles requests for the JSON Web Key Set (JWKS).
@@ -50,22 +49,13 @@ func (h *jwksHandler) HandleJWKSRequest(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-
-	if err := json.NewEncoder(w).Encode(jwksResponse); err != nil {
-		logger.Error("Error encoding JWKS response", log.Error(err))
-		http.Error(w, "Failed to encode JWKS response", http.StatusInternalServerError)
-		return
-	}
+	sysutils.WriteSuccessResponse(w, http.StatusOK, jwksResponse, logger)
 	logger.Debug("JWKS response successfully sent")
 }
 
 // handleError handles errors by writing an appropriate error response to the HTTP response writer.
 func (h *jwksHandler) handleError(w http.ResponseWriter, logger *log.Logger,
 	svcErr *serviceerror.ServiceError) {
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-
 	errResp := apierror.ErrorResponse{
 		Code:        svcErr.Code,
 		Message:     svcErr.Error,
@@ -76,10 +66,6 @@ func (h *jwksHandler) handleError(w http.ResponseWriter, logger *log.Logger,
 	if svcErr.Type == serviceerror.ClientErrorType {
 		statusCode = http.StatusBadRequest
 	}
-	w.WriteHeader(statusCode)
 
-	if err := json.NewEncoder(w).Encode(errResp); err != nil {
-		logger.Error("Error encoding error response", log.Error(err))
-		http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-	}
+	sysutils.WriteErrorResponse(w, statusCode, errResp, logger)
 }

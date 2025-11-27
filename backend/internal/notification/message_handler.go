@@ -19,14 +19,12 @@
 package notification
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/asgardeo/thunder/internal/notification/common"
 	"github.com/asgardeo/thunder/internal/system/cmodels"
-	serverconst "github.com/asgardeo/thunder/internal/system/constants"
 	"github.com/asgardeo/thunder/internal/system/error/apierror"
 	"github.com/asgardeo/thunder/internal/system/error/serviceerror"
 	"github.com/asgardeo/thunder/internal/system/log"
@@ -70,14 +68,7 @@ func (h *messageNotificationSenderHandler) HandleSenderListRequest(w http.Respon
 		senderResponses = append(senderResponses, senderResponse)
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-
-	if err := json.NewEncoder(w).Encode(senderResponses); err != nil {
-		logger.Error("Error encoding response", log.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
+	sysutils.WriteSuccessResponse(w, http.StatusOK, senderResponses, logger)
 }
 
 // HandleSenderCreateRequest handles the request to create a new message notification sender
@@ -100,19 +91,12 @@ func (h *messageNotificationSenderHandler) HandleSenderCreateRequest(w http.Resp
 	createdSender, svcErr := h.mgtService.CreateSender(*senderDTO)
 	if svcErr != nil {
 		if svcErr.Code == ErrorDuplicateSenderName.Code {
-			w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-			w.WriteHeader(http.StatusConflict)
-
 			errResp := apierror.ErrorResponse{
 				Code:        svcErr.Code,
 				Message:     svcErr.Error,
 				Description: svcErr.ErrorDescription,
 			}
-
-			if err := json.NewEncoder(w).Encode(errResp); err != nil {
-				logger.Error("Error encoding error response", log.Error(err))
-				http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-			}
+			sysutils.WriteErrorResponse(w, http.StatusConflict, errResp, logger)
 			return
 		}
 
@@ -127,14 +111,7 @@ func (h *messageNotificationSenderHandler) HandleSenderCreateRequest(w http.Resp
 		return
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusCreated)
-
-	if err := json.NewEncoder(w).Encode(senderResponse); err != nil {
-		logger.Error("Error encoding response", log.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
+	sysutils.WriteSuccessResponse(w, http.StatusCreated, senderResponse, logger)
 }
 
 // HandleSenderGetRequest handles the request to get a message notification sender by ID
@@ -152,18 +129,12 @@ func (h *messageNotificationSenderHandler) HandleSenderGetRequest(w http.Respons
 		return
 	}
 	if sender == nil {
-		w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-		w.WriteHeader(http.StatusNotFound)
 		errResp := apierror.ErrorResponse{
 			Code:        ErrorSenderNotFound.Code,
 			Message:     ErrorSenderNotFound.Error,
 			Description: ErrorSenderNotFound.ErrorDescription,
 		}
-		if err := json.NewEncoder(w).Encode(errResp); err != nil {
-			logger.Error("Error encoding error response", log.Error(err))
-			http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-			return
-		}
+		sysutils.WriteErrorResponse(w, http.StatusNotFound, errResp, logger)
 		return
 	}
 
@@ -174,14 +145,7 @@ func (h *messageNotificationSenderHandler) HandleSenderGetRequest(w http.Respons
 		return
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-
-	if err := json.NewEncoder(w).Encode(senderResponse); err != nil {
-		logger.Error("Error encoding response", log.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
+	sysutils.WriteSuccessResponse(w, http.StatusOK, senderResponse, logger)
 }
 
 // HandleSenderUpdateRequest handles the request to update a message notification sender
@@ -219,14 +183,7 @@ func (h *messageNotificationSenderHandler) HandleSenderUpdateRequest(w http.Resp
 		return
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-
-	if err := json.NewEncoder(w).Encode(senderResponse); err != nil {
-		logger.Error("Error encoding response", log.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
+	sysutils.WriteSuccessResponse(w, http.StatusOK, senderResponse, logger)
 }
 
 // HandleSenderDeleteRequest handles the request to delete a message notification sender
@@ -269,13 +226,7 @@ func (h *messageNotificationSenderHandler) HandleOTPSendRequest(w http.ResponseW
 		SessionToken: resultDTO.SessionToken,
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(otpResponse); err != nil {
-		logger.Error("Failed to encode response", log.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
+	sysutils.WriteSuccessResponse(w, http.StatusOK, otpResponse, logger)
 }
 
 // HandleOTPVerifyRequest handles the request to verify an OTP.
@@ -299,20 +250,12 @@ func (h *messageNotificationSenderHandler) HandleOTPVerifyRequest(w http.Respons
 		Status: string(resultDTO.Status),
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		logger.Error("Failed to encode response", log.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
+	sysutils.WriteSuccessResponse(w, http.StatusOK, response, logger)
 }
 
 // handleError handles service errors and returns appropriate HTTP responses.
 func (h *messageNotificationSenderHandler) handleError(w http.ResponseWriter, logger *log.Logger,
 	svcErr *serviceerror.ServiceError, customErrDesc string) {
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-
 	apiErrDesc := svcErr.ErrorDescription
 	if customErrDesc != "" {
 		apiErrDesc = customErrDesc
@@ -334,12 +277,8 @@ func (h *messageNotificationSenderHandler) handleError(w http.ResponseWriter, lo
 			statusCode = http.StatusBadRequest
 		}
 	}
-	w.WriteHeader(statusCode)
 
-	if err := json.NewEncoder(w).Encode(errResp); err != nil {
-		logger.Error("Error encoding error response", log.Error(err))
-		http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-	}
+	sysutils.WriteErrorResponse(w, statusCode, errResp, logger)
 }
 
 // validateSenderID validates the sender ID and returns true if valid

@@ -20,13 +20,12 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
-	"github.com/asgardeo/thunder/internal/system/constants"
 	"github.com/asgardeo/thunder/internal/system/healthcheck/model"
 	"github.com/asgardeo/thunder/internal/system/healthcheck/provider"
 	"github.com/asgardeo/thunder/internal/system/log"
+	sysutils "github.com/asgardeo/thunder/internal/system/utils"
 )
 
 // HealthCheckHandler defines the handler for managing health check API requests.
@@ -55,21 +54,14 @@ func (hch *HealthCheckHandler) HandleReadinessRequest(w http.ResponseWriter, r *
 	healthcheckService := hch.Provider.GetHealthCheckService()
 	serverstatus := healthcheckService.CheckReadiness()
 
+	statusCode := http.StatusOK
 	if serverstatus.Status != model.StatusUp {
 		logger.Error("Readiness check failed", log.String("serverstatus", string(serverstatus.Status)))
-		w.WriteHeader(http.StatusServiceUnavailable)
+		statusCode = http.StatusServiceUnavailable
 	} else {
 		logger.Debug("Readiness check passed", log.String("serverstatus", string(serverstatus.Status)))
-		w.WriteHeader(http.StatusOK)
 	}
 
-	w.Header().Set(constants.ContentTypeHeaderName, constants.ContentTypeJSON)
-	err := json.NewEncoder(w).Encode(serverstatus)
-	if err != nil {
-		logger.Error("Error while checking readiness", log.Error(err))
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
+	sysutils.WriteSuccessResponse(w, statusCode, serverstatus, logger)
 	logger.Debug("Health Check Readiness response sent")
 }

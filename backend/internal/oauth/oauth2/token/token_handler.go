@@ -220,18 +220,15 @@ func (th *tokenHandler) HandleTokenRequest(w http.ResponseWriter, r *http.Reques
 	logger.Debug("Token generated successfully", log.String("client_id", clientID),
 		log.String("grant_type", grantTypeStr))
 
-	// Set the response headers.
+	// Set the response headers - OAuth2 token endpoint requires specific security headers.
 	w.Header().Set("Content-Type", "application/json")
-	// Must include the following headers when sensitive data is returned.
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Pragma", "no-cache")
+	w.WriteHeader(http.StatusOK)
 
 	// Write the token response.
-	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(tokenResponse); err != nil {
 		logger.Error("Failed to write token response", log.Error(err))
-		http.Error(w, "Failed to write token response", http.StatusInternalServerError)
-		return
 	}
 	logger.Debug("Token response sent", log.String("client_id", clientID), log.String("grant_type", grantTypeStr))
 }

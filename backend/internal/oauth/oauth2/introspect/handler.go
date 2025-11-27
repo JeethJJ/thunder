@@ -26,6 +26,7 @@ import (
 	"github.com/asgardeo/thunder/internal/oauth/oauth2/model"
 	serverconst "github.com/asgardeo/thunder/internal/system/constants"
 	"github.com/asgardeo/thunder/internal/system/log"
+	sysutils "github.com/asgardeo/thunder/internal/system/utils"
 )
 
 // tokenIntrospectionHandler handles OAuth 2.0 token introspection requests.
@@ -45,34 +46,22 @@ func (h *tokenIntrospectionHandler) HandleIntrospect(w http.ResponseWriter, r *h
 	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "TokenIntrospectionHandler"))
 
 	if err := r.ParseForm(); err != nil {
-		w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-		w.WriteHeader(http.StatusBadRequest)
-
 		errResp := model.ErrorResponse{
 			Error:            constants.ErrorInvalidRequest,
 			ErrorDescription: "Failed to decode request body",
 		}
-		if err := json.NewEncoder(w).Encode(errResp); err != nil {
-			logger.Error("Error encoding error response", log.Error(err))
-			http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-		}
+		h.writeOAuth2ErrorResponse(w, http.StatusBadRequest, errResp, logger)
 		return
 	}
 
 	// Extract request parameters
 	token := r.FormValue(constants.RequestParamToken)
 	if token == "" {
-		w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-		w.WriteHeader(http.StatusBadRequest)
-
 		errResp := model.ErrorResponse{
 			Error:            constants.ErrorInvalidRequest,
 			ErrorDescription: "Token parameter is required",
 		}
-		if err := json.NewEncoder(w).Encode(errResp); err != nil {
-			logger.Error("Error encoding error response", log.Error(err))
-			http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-		}
+		h.writeOAuth2ErrorResponse(w, http.StatusBadRequest, errResp, logger)
 		return
 	}
 	// token_type_hint parameter is not supported due to non persistent tokens in the server
@@ -80,25 +69,22 @@ func (h *tokenIntrospectionHandler) HandleIntrospect(w http.ResponseWriter, r *h
 
 	response, err := h.service.IntrospectToken(token, tokenTypeHint)
 	if err != nil {
-		w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-		w.WriteHeader(http.StatusInternalServerError)
-
 		errResp := model.ErrorResponse{
 			Error:            constants.ErrorServerError,
 			ErrorDescription: "Server error while introspecting token",
 		}
-		if err := json.NewEncoder(w).Encode(errResp); err != nil {
-			logger.Error("Error encoding error response", log.Error(err))
-			http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-		}
+		h.writeOAuth2ErrorResponse(w, http.StatusInternalServerError, errResp, logger)
 		return
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
+	sysutils.WriteSuccessResponse(w, http.StatusOK, response, logger)
+}
 
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		logger.Error("Error encoding response", log.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+// writeOAuth2ErrorResponse writes an OAuth2 error response
+func (h *tokenIntrospectionHandler) writeOAuth2ErrorResponse(w http.ResponseWriter, statusCode int, errResp model.ErrorResponse, logger *log.Logger) {
+	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
+	w.WriteHeader(statusCode)
+	if err := json.NewEncoder(w).Encode(errResp); err != nil {
+		logger.Error("Error encoding OAuth2 error response", log.Error(err))
 	}
 }

@@ -19,7 +19,6 @@
 package userschema
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -64,15 +63,7 @@ func (h *userSchemaHandler) HandleUserSchemaListRequest(w http.ResponseWriter, r
 		return
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-
-	if err := json.NewEncoder(w).Encode(userSchemaListResponse); err != nil {
-		logger.Error("Error encoding response", log.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return
-	}
-
+	sysutils.WriteSuccessResponse(w, http.StatusOK, userSchemaListResponse, logger)
 	logger.Debug("Successfully listed user schemas with pagination",
 		log.Int("limit", limit), log.Int("offset", offset),
 		log.Int("totalResults", userSchemaListResponse.TotalResults),
@@ -85,19 +76,12 @@ func (h *userSchemaHandler) HandleUserSchemaPostRequest(w http.ResponseWriter, r
 
 	createRequest, err := sysutils.DecodeJSONBody[CreateUserSchemaRequest](r)
 	if err != nil {
-		w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-		w.WriteHeader(http.StatusBadRequest)
-
 		errResp := apierror.ErrorResponse{
 			Code:        ErrorInvalidRequestFormat.Code,
 			Message:     ErrorInvalidRequestFormat.Error,
 			Description: "Failed to parse request body",
 		}
-
-		if err := json.NewEncoder(w).Encode(errResp); err != nil {
-			logger.Error("Error encoding error response", log.Error(err))
-			http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-		}
+		sysutils.WriteErrorResponse(w, http.StatusBadRequest, errResp, logger)
 		return
 	}
 
@@ -224,36 +208,24 @@ func handleError(w http.ResponseWriter, logger *log.Logger, svcErr *serviceerror
 		statusCode = http.StatusInternalServerError
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(statusCode)
-
 	errResp := apierror.ErrorResponse{
 		Code:        svcErr.Code,
 		Message:     svcErr.Error,
 		Description: svcErr.ErrorDescription,
 	}
-
-	if err := json.NewEncoder(w).Encode(errResp); err != nil {
-		logger.Error("Error encoding error response", log.Error(err))
-		http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-	}
+	sysutils.WriteErrorResponse(w, statusCode, errResp, logger)
 }
 
 // extractAndValidateSchemaID extracts and validates the schema ID from the URL path.
 func extractAndValidateSchemaID(w http.ResponseWriter, r *http.Request, logger *log.Logger) (string, bool) {
 	schemaID := r.PathValue("id")
 	if schemaID == "" {
-		w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-		w.WriteHeader(http.StatusBadRequest)
 		errResp := apierror.ErrorResponse{
 			Code:        ErrorInvalidUserSchemaRequest.Code,
 			Message:     ErrorInvalidUserSchemaRequest.Error,
 			Description: ErrorInvalidUserSchemaRequest.ErrorDescription,
 		}
-		if err := json.NewEncoder(w).Encode(errResp); err != nil {
-			logger.Error("Error encoding error response", log.Error(err))
-			http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-		}
+		sysutils.WriteErrorResponse(w, http.StatusBadRequest, errResp, logger)
 		return "", true
 	}
 
@@ -265,19 +237,12 @@ func validateUpdateUserSchemaRequest(
 ) (UpdateUserSchemaRequest, bool) {
 	updateRequest, err := sysutils.DecodeJSONBody[UpdateUserSchemaRequest](r)
 	if err != nil {
-		w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-		w.WriteHeader(http.StatusBadRequest)
-
 		errResp := apierror.ErrorResponse{
 			Code:        ErrorInvalidRequestFormat.Code,
 			Message:     ErrorInvalidRequestFormat.Error,
 			Description: "Failed to parse request body",
 		}
-
-		if err := json.NewEncoder(w).Encode(errResp); err != nil {
-			logger.Error("Error encoding error response", log.Error(err))
-			http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-		}
+		sysutils.WriteErrorResponse(w, http.StatusBadRequest, errResp, logger)
 		return UpdateUserSchemaRequest{}, true
 	}
 
@@ -287,14 +252,7 @@ func validateUpdateUserSchemaRequest(
 
 func buildUserSchemaResponse(
 	w http.ResponseWriter, userSchema *UserSchema, logger *log.Logger, statusCode int) bool {
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(statusCode)
-
-	if err := json.NewEncoder(w).Encode(userSchema); err != nil {
-		logger.Error("Error encoding response", log.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-		return false
-	}
+	sysutils.WriteSuccessResponse(w, statusCode, userSchema, logger)
 	return true
 }
 

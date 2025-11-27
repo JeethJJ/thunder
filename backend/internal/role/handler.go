@@ -19,8 +19,6 @@
 package role
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -76,13 +74,7 @@ func (rh *roleHandler) HandleRoleListRequest(w http.ResponseWriter, r *http.Requ
 		Links:        toHTTPLinks(roleList.Links),
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-
-	isErr := writeToResponse(w, roleListResponse, logger)
-	if isErr {
-		return
-	}
+	sysutils.WriteSuccessResponse(w, http.StatusOK, roleListResponse, logger)
 
 	logger.Debug("Successfully listed roles with pagination",
 		log.Int("limit", limit), log.Int("offset", offset),
@@ -114,13 +106,7 @@ func (rh *roleHandler) HandleRolePostRequest(w http.ResponseWriter, r *http.Requ
 	// Convert service response to HTTP response
 	createdRole := rh.toHTTPCreateRoleResponse(serviceRole)
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusCreated)
-
-	isErr := writeToResponse(w, createdRole, logger)
-	if isErr {
-		return
-	}
+	sysutils.WriteSuccessResponse(w, http.StatusCreated, createdRole, logger)
 
 	logger.Debug("Successfully created role", log.String("roleId", createdRole.ID))
 }
@@ -139,13 +125,7 @@ func (rh *roleHandler) HandleRoleGetRequest(w http.ResponseWriter, r *http.Reque
 	// Convert service response to HTTP response
 	role := rh.toHTTPRoleResponse(serviceRole)
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-
-	isErr := writeToResponse(w, role, logger)
-	if isErr {
-		return
-	}
+	sysutils.WriteSuccessResponse(w, http.StatusOK, role, logger)
 
 	logger.Debug("Successfully retrieved role", log.String("role id", id))
 }
@@ -175,13 +155,7 @@ func (rh *roleHandler) HandleRolePutRequest(w http.ResponseWriter, r *http.Reque
 	// Convert service response to HTTP response
 	role := rh.toHTTPRoleResponse(serviceRole)
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-
-	isErr := writeToResponse(w, role, logger)
-	if isErr {
-		return
-	}
+	sysutils.WriteSuccessResponse(w, http.StatusOK, role, logger)
 
 	logger.Debug("Successfully updated role", log.String("role id", id))
 }
@@ -235,13 +209,7 @@ func (rh *roleHandler) HandleRoleAssignmentsGetRequest(w http.ResponseWriter, r 
 		Links:        toHTTPLinks(serviceResponse.Links),
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-
-	isErr := writeToResponse(w, assignmentListResponse, logger)
-	if isErr {
-		return
-	}
+	sysutils.WriteSuccessResponse(w, http.StatusOK, assignmentListResponse, logger)
 
 	logger.Debug("Successfully retrieved role assignments", log.String("role id", id),
 		log.Int("limit", limit), log.Int("offset", offset),
@@ -302,16 +270,6 @@ func (rh *roleHandler) HandleRoleRemoveAssignmentsRequest(w http.ResponseWriter,
 	logger.Debug("Successfully removed assignments from role", log.String("role id", id))
 }
 
-// writeToResponse encodes the response as JSON and writes it to the ResponseWriter.
-func writeToResponse(w http.ResponseWriter, response any, logger *log.Logger) bool {
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		logger.Error("Error encoding response", log.Error(err))
-		handleEncodingError(w)
-		return true
-	}
-	return false
-}
-
 // handleError handles service errors and returns appropriate HTTP responses.
 func handleError(w http.ResponseWriter, logger *log.Logger,
 	svcErr *serviceerror.ServiceError) {
@@ -334,26 +292,12 @@ func handleError(w http.ResponseWriter, logger *log.Logger,
 	}
 
 	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(statusCode)
-
 	errResp := apierror.ErrorResponse{
 		Code:        svcErr.Code,
 		Message:     svcErr.Error,
 		Description: svcErr.ErrorDescription,
 	}
-
-	if err := json.NewEncoder(w).Encode(errResp); err != nil {
-		logger.Error("Error encoding error response", log.Error(err))
-		handleEncodingError(w)
-		return
-	}
-}
-
-// handleEncodingError handles errors that occur during response encoding.
-func handleEncodingError(w http.ResponseWriter) {
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusInternalServerError)
-	_, _ = fmt.Fprintln(w, serviceerror.ErrorEncodingError)
+	sysutils.WriteErrorResponse(w, statusCode, errResp, logger)
 }
 
 // sanitizeCreateRoleRequest sanitizes the create role request input.

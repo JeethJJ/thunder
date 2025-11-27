@@ -19,7 +19,6 @@
 package authn
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/asgardeo/thunder/internal/authn/common"
@@ -27,7 +26,6 @@ import (
 	"github.com/asgardeo/thunder/internal/authn/otp"
 	"github.com/asgardeo/thunder/internal/idp"
 	notifcommon "github.com/asgardeo/thunder/internal/notification/common"
-	serverconst "github.com/asgardeo/thunder/internal/system/constants"
 	"github.com/asgardeo/thunder/internal/system/error/apierror"
 	"github.com/asgardeo/thunder/internal/system/error/serviceerror"
 	"github.com/asgardeo/thunder/internal/system/log"
@@ -255,26 +253,12 @@ func (ah *authenticationHandler) handleServiceError(w http.ResponseWriter, svcEr
 // writeSuccessResponse writes a successful JSON response.
 func (ah *authenticationHandler) writeSuccessResponse(w http.ResponseWriter, data interface{}) {
 	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "AuthenticationHandler"))
-
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusOK)
-
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		logger.Error("Failed to encode response", log.Error(err))
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
-	}
+	sysutils.WriteSuccessResponse(w, http.StatusOK, data, logger)
 }
 
 // writeErrorResponse writes an error response.
 func (ah *authenticationHandler) writeErrorResponse(w http.ResponseWriter,
 	statusCode int, errorResp apierror.ErrorResponse) {
 	logger := log.GetLogger().With(log.String(log.LoggerKeyComponentName, "AuthenticationHandler"))
-
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(statusCode)
-
-	if err := json.NewEncoder(w).Encode(errorResp); err != nil {
-		logger.Error("Failed to encode error response", log.Error(err))
-		http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
-	}
+	sysutils.WriteErrorResponse(w, statusCode, errorResp, logger)
 }

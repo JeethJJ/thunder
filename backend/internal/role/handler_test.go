@@ -28,8 +28,6 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
-
-	"github.com/asgardeo/thunder/internal/system/log"
 )
 
 type RoleHandlerTestSuite struct {
@@ -719,25 +717,4 @@ func (suite *RoleHandlerTestSuite) TestSanitizeAssignmentsRequest() {
 
 	suite.Equal("group1", sanitized.Assignments[0].ID)
 	suite.Equal(AssigneeTypeGroup, sanitized.Assignments[0].Type)
-}
-
-func (suite *RoleHandlerTestSuite) TestwriteToResponse_Success() {
-	response := &RoleResponse{
-		ID:                 "role1",
-		Name:               "Role 1",
-		Description:        "A sample role",
-		OrganizationUnitID: "ou1",
-	}
-
-	w := httptest.NewRecorder()
-	isErr := writeToResponse(w, response, log.GetLogger())
-	suite.False(isErr)
-}
-
-func (suite *RoleHandlerTestSuite) TestwriteToResponse_Error() {
-	// Use a function which cannot be marshaled to JSON to cause encoding error
-	response := func() {}
-	w := httptest.NewRecorder()
-	isErr := writeToResponse(w, response, log.GetLogger())
-	suite.True(isErr)
 }

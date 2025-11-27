@@ -494,26 +494,6 @@ func (suite *BrandingHandlerTestSuite) TestToHTTPLinks_Empty() {
 	suite.Len(httpLinks, 0)
 }
 
-// Test handleEncodingError
-func (suite *BrandingHandlerTestSuite) TestHandleEncodingError() {
-	w := httptest.NewRecorder()
-	handleEncodingError(w)
-	suite.Equal(http.StatusInternalServerError, w.Code)
-	suite.Equal("application/json", w.Header().Get("Content-Type"))
-}
-
-// Test writeToResponse error path
-func (suite *BrandingHandlerTestSuite) TestWriteToResponse_Error() {
-	// Create a response writer that will fail on Write
-	w := &failingResponseWriter{ResponseWriter: httptest.NewRecorder()}
-	logger := log.GetLogger()
-
-	// Use a type that cannot be encoded (channel)
-	response := make(chan int)
-	isErr := writeToResponse(w, response, logger)
-	suite.True(isErr)
-}
-
 // Test handleError default case
 func (suite *BrandingHandlerTestSuite) TestHandleError_DefaultCase() {
 	// Create an error with unknown code

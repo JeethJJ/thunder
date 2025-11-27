@@ -19,8 +19,6 @@
 package userinfo
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/asgardeo/thunder/internal/oauth/oauth2/constants"
@@ -28,6 +26,7 @@ import (
 	"github.com/asgardeo/thunder/internal/system/error/serviceerror"
 	"github.com/asgardeo/thunder/internal/system/log"
 	"github.com/asgardeo/thunder/internal/system/utils"
+	sysutils "github.com/asgardeo/thunder/internal/system/utils"
 )
 
 const handlerLoggerComponentName = "UserInfoHandler"
@@ -63,25 +62,11 @@ func (h *userInfoHandler) HandleUserInfo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
 	w.Header().Set(serverconst.CacheControlHeaderName, serverconst.CacheControlNoStore)
 	w.Header().Set(serverconst.PragmaHeaderName, serverconst.PragmaNoCache)
 
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(userInfo); err != nil {
-		h.logger.Error("Error encoding user info response", log.Error(err))
-		handleEncodingError(w)
-		return
-	}
-
+	sysutils.WriteSuccessResponse(w, http.StatusOK, userInfo, h.logger)
 	h.logger.Debug("UserInfo response sent successfully")
-}
-
-// handleEncodingError handles errors that occur during response encoding.
-func handleEncodingError(w http.ResponseWriter) {
-	w.Header().Set(serverconst.ContentTypeHeaderName, serverconst.ContentTypeJSON)
-	w.WriteHeader(http.StatusInternalServerError)
-	_, _ = fmt.Fprintln(w, serviceerror.ErrorEncodingError)
 }
 
 // writeServiceErrorResponse writes a service error response.
