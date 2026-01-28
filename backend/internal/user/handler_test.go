@@ -25,9 +25,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/asgardeo/thunder/internal/system/error/apierror"
+	"github.com/asgardeo/thunder/internal/system/error/serviceerror"
 	"github.com/asgardeo/thunder/internal/system/security"
 )
 
@@ -44,7 +46,7 @@ func TestHandleSelfUserGetRequest_Success(t *testing.T) {
 		ID:         userID,
 		Attributes: json.RawMessage(`{"username":"alice"}`),
 	}
-	mockSvc.On("GetUser", userID).Return(expectedUser, nil)
+	mockSvc.On("GetUser", mock.Anything, userID).Return(expectedUser, nil)
 
 	handler := newUserHandler(mockSvc)
 	req := httptest.NewRequest(http.MethodGet, "/users/me", nil)
@@ -88,7 +90,7 @@ func TestHandleSelfUserPutRequest_Success(t *testing.T) {
 		Type:       "employee",
 		Attributes: attributes,
 	}
-	mockSvc.On("UpdateUserAttributes", userID, attributes).Return(updatedUser, nil)
+	mockSvc.On("UpdateUserAttributes", mock.Anything, userID, attributes).Return(updatedUser, nil)
 
 	handler := newUserHandler(mockSvc)
 	body := bytes.NewBufferString(`{"attributes":{"email":"alice@example.com"}}`)
@@ -132,7 +134,7 @@ func TestHandleSelfUserCredentialUpdateRequest_Success(t *testing.T) {
 
 	mockSvc := NewUserServiceInterfaceMock(t)
 	credentialsJSON := json.RawMessage(`{"password":[{"value":"Secret123!"}]}`)
-	mockSvc.On("UpdateUserCredentials", userID, credentialsJSON).Return(nil)
+	mockSvc.On("UpdateUserCredentials", mock.Anything, userID, credentialsJSON).Return(nil)
 
 	handler := newUserHandler(mockSvc)
 	req := httptest.NewRequest(http.MethodPost, "/users/me/update-credentials",
@@ -152,7 +154,7 @@ func TestHandleSelfUserCredentialUpdateRequest_StringValue(t *testing.T) {
 
 	mockSvc := NewUserServiceInterfaceMock(t)
 	credentialsJSON := json.RawMessage(`{"password":"plaintext-password"}`)
-	mockSvc.On("UpdateUserCredentials", userID, credentialsJSON).Return(nil)
+	mockSvc.On("UpdateUserCredentials", mock.Anything, userID, credentialsJSON).Return(nil)
 
 	handler := newUserHandler(mockSvc)
 	req := httptest.NewRequest(http.MethodPost, "/users/me/update-credentials",
@@ -187,82 +189,64 @@ func TestHandleSelfUserCredentialUpdateRequest_MissingCredentials(t *testing.T) 
 	require.Equal(t, ErrorMissingCredentials.Code, errResp.Code)
 }
 
-func TestHandleSelfUserCredentialUpdateRequest_InvalidJSONInAttributes(t *testing.T) {
+func TestHandleSelfUserCredentialUpdateRequest_ErrorCases(t *testing.T) {
 	userID := testUserID789
 	authCtx := security.NewSecurityContextForTest(userID, "", "", "", nil)
 
-	mockSvc := NewUserServiceInterfaceMock(t)
-	// Service will be called and return error for invalid JSON
-	credentialsJSON := json.RawMessage(`["invalid","array"]`)
-	mockSvc.On("UpdateUserCredentials", userID, credentialsJSON).Return(&ErrorInvalidRequestFormat)
+	testCases := []struct {
+		name             string
+		requestBody      string
+		mockJSON         json.RawMessage
+		mockError        *serviceerror.ServiceError
+		expectedHTTPCode int
+		expectedErrCode  string
+	}{
+		{
+			name:             "Invalid JSON in attributes",
+			requestBody:      `{"attributes":["invalid","array"]}`,
+			mockJSON:         json.RawMessage(`["invalid","array"]`),
+			mockError:        &ErrorInvalidRequestFormat,
+			expectedHTTPCode: http.StatusBadRequest,
+			expectedErrCode:  ErrorInvalidRequestFormat.Code,
+		},
+		{
+			name:             "Invalid credential type",
+			requestBody:      `{"attributes":{"unsupported_type":"some_value"}}`,
+			mockJSON:         json.RawMessage(`{"unsupported_type":"some_value"}`),
+			mockError:        &ErrorInvalidCredential,
+			expectedHTTPCode: http.StatusBadRequest,
+			expectedErrCode:  ErrorInvalidCredential.Code,
+		},
+		{
+			name:             "Service error",
+			requestBody:      `{"attributes":{"password":"test_password"}}`,
+			mockJSON:         json.RawMessage(`{"password":"test_password"}`),
+			mockError:        &ErrorInvalidCredential,
+			expectedHTTPCode: http.StatusBadRequest,
+			expectedErrCode:  ErrorInvalidCredential.Code,
+		},
+	}
 
-	handler := newUserHandler(mockSvc)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockSvc := NewUserServiceInterfaceMock(t)
+			mockSvc.On("UpdateUserCredentials", mock.Anything, userID, tc.mockJSON).Return(tc.mockError)
 
-	// Send attributes with invalid JSON (array instead of map)
-	req := httptest.NewRequest(http.MethodPost, "/users/me/update-credentials",
-		bytes.NewBufferString(`{"attributes":["invalid","array"]}`))
-	req = req.WithContext(security.WithSecurityContextTest(req.Context(), authCtx))
-	rr := httptest.NewRecorder()
+			handler := newUserHandler(mockSvc)
+			req := httptest.NewRequest(http.MethodPost, "/users/me/update-credentials",
+				bytes.NewBufferString(tc.requestBody))
+			req = req.WithContext(security.WithSecurityContextTest(req.Context(), authCtx))
+			rr := httptest.NewRecorder()
 
-	handler.HandleSelfUserCredentialUpdateRequest(rr, req)
+			handler.HandleSelfUserCredentialUpdateRequest(rr, req)
 
-	require.Equal(t, http.StatusBadRequest, rr.Code)
+			require.Equal(t, tc.expectedHTTPCode, rr.Code)
 
-	var errResp apierror.ErrorResponse
-	require.NoError(t, json.NewDecoder(rr.Body).Decode(&errResp))
-	require.Equal(t, ErrorInvalidRequestFormat.Code, errResp.Code)
-}
-
-func TestHandleSelfUserCredentialUpdateRequest_InvalidCredentialType(t *testing.T) {
-	userID := testUserID789
-	authCtx := security.NewSecurityContextForTest(userID, "", "", "", nil)
-
-	mockSvc := NewUserServiceInterfaceMock(t)
-	// Service will be called and return error for invalid credential type
-	credentialsJSON := json.RawMessage(`{"unsupported_type":"some_value"}`)
-	mockSvc.On("UpdateUserCredentials", userID, credentialsJSON).Return(&ErrorInvalidCredential)
-
-	handler := newUserHandler(mockSvc)
-
-	// Send unsupported credential type
-	req := httptest.NewRequest(http.MethodPost, "/users/me/update-credentials",
-		bytes.NewBufferString(`{"attributes":{"unsupported_type":"some_value"}}`))
-	req = req.WithContext(security.WithSecurityContextTest(req.Context(), authCtx))
-	rr := httptest.NewRecorder()
-
-	handler.HandleSelfUserCredentialUpdateRequest(rr, req)
-
-	require.Equal(t, http.StatusBadRequest, rr.Code)
-
-	var errResp apierror.ErrorResponse
-	require.NoError(t, json.NewDecoder(rr.Body).Decode(&errResp))
-	require.Equal(t, ErrorInvalidCredential.Code, errResp.Code)
-}
-
-func TestHandleSelfUserCredentialUpdateRequest_ServiceError(t *testing.T) {
-	userID := testUserID789
-	authCtx := security.NewSecurityContextForTest(userID, "", "", "", nil)
-
-	mockSvc := NewUserServiceInterfaceMock(t)
-	credentialsJSON := json.RawMessage(`{"password":"test_password"}`)
-
-	// Mock service to return an error
-	mockSvc.On("UpdateUserCredentials", userID, credentialsJSON).
-		Return(&ErrorInvalidCredential)
-
-	handler := newUserHandler(mockSvc)
-	req := httptest.NewRequest(http.MethodPost, "/users/me/update-credentials",
-		bytes.NewBufferString(`{"attributes":{"password":"test_password"}}`))
-	req = req.WithContext(security.WithSecurityContextTest(req.Context(), authCtx))
-	rr := httptest.NewRecorder()
-
-	handler.HandleSelfUserCredentialUpdateRequest(rr, req)
-
-	require.Equal(t, http.StatusBadRequest, rr.Code)
-
-	var errResp apierror.ErrorResponse
-	require.NoError(t, json.NewDecoder(rr.Body).Decode(&errResp))
-	require.Equal(t, ErrorInvalidCredential.Code, errResp.Code)
+			var errResp apierror.ErrorResponse
+			require.NoError(t, json.NewDecoder(rr.Body).Decode(&errResp))
+			require.Equal(t, tc.expectedErrCode, errResp.Code)
+		})
+	}
 }
 
 func TestHandleSelfUserCredentialUpdateRequest_MultipleCredentialTypes(t *testing.T) {
@@ -272,7 +256,7 @@ func TestHandleSelfUserCredentialUpdateRequest_MultipleCredentialTypes(t *testin
 	mockSvc := NewUserServiceInterfaceMock(t)
 	// Test that multiple credential types are updated in a single atomic call
 	credentialsJSON := json.RawMessage(`{"password":"new-password","pin":"1234"}`)
-	mockSvc.On("UpdateUserCredentials", userID, credentialsJSON).Return(nil)
+	mockSvc.On("UpdateUserCredentials", mock.Anything, userID, credentialsJSON).Return(nil)
 
 	handler := newUserHandler(mockSvc)
 	req := httptest.NewRequest(http.MethodPost, "/users/me/update-credentials",
